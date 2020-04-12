@@ -1,0 +1,12 @@
+See the file doc/index.html.
+
+-------------------------------------------
+To do a basic build, run
+
+./configure && make 
+
+from the top directory.
+
+"make install" will install /usr/local/bin by default. To change
+this, run ./configure with the --bindir=/absolute/path/to/install/dir
+option.

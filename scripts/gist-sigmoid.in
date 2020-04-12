@@ -1,0 +1,364 @@
+# -* perl *-
+# FILE: fit-sigmoid
+# AUTHOR: William Stafford Noble
+# CREATE DATE: 05/21/02
+# PROJECT: SVM
+# DESCRIPTION: Fit a sigmoid to SVM outputs.  
+#
+# The "platt" algorithm is based upon pseudocode given in
+# "Probabilistic outputs for support vector machines and comparison to
+# regularized likelihood methods" by John Platt.
+#
+# The "lin" algorithm is based upon pseduocode provided in "A note on
+# Platt's probabilistic outputs for support vector machines" by Lin H,
+# Lin C, and Weng R. Technical report, Department of Computer Science
+# and Information Engineering, National Taiwan University, 2003).
+# This code was supplied by Michael E. Matheny
+# (mmatheny@dsg.harvard.edu).
+#
+use strict;
+
+my $usage = "USAGE: gist-sigmoid <labels> <train> <predictions>
+
+  -algorithm [platt|lin] (default=platt)
+
+\n";
+
+# Parse the command line.
+my $algorithm = "platt";
+while (scalar(@ARGV) > 3) {
+  my $next_arg = shift(@ARGV);
+  if ($next_arg eq "-algorithm") {
+    $algorithm = shift(@ARGV);
+  } else {
+    print(STDERR "Invalid option ($next_arg).\n");
+    exit(1);
+  }
+}
+if (scalar(@ARGV) != 3) {
+  print(STDERR $usage);
+  exit(1);
+}
+my($labels, $train, $predictions) = @ARGV;
+
+# Read the true labels.
+my($header, $titles, @target) = &read_file_column(1, $labels);
+
+# Read the training set.
+($header, $titles, my @out) = &read_file_column(2, $train);
+
+# Read the predictions.
+($header, $titles, my @predictions) = &read_file_column(2, $predictions);
+
+# Read the row names.
+($header, $titles, my @names) = &read_file_column(0, $predictions);
+
+# Count the number of positives and negatives.
+my $prior1 = 0;
+my $prior0 = 0;
+foreach my $target (@target) {
+  if ($target == 1) {
+    $prior1++;
+  } elsif ($target == -1) {
+    $prior0++;
+  } else {
+    die("Invalid class label ($target).");
+  }
+}
+print(STDERR "prior1=$prior1 prior0=$prior0\n");
+
+# Run one of the two optimization algorithms.
+# For simplicity, inputs are accessed as globals.
+my($A, $B, $err);
+if ($algorithm eq "platt") {
+  ($A, $B, $err) = &run_platt_algorithm();
+  printf(STDERR "A=%g B=%g Error=%g\n", $A, $B, $err);
+} elsif ($algorithm eq "lin") {
+  ($A, $B) = &run_lin_algorithm();
+  printf(STDERR "A=%g B=%g\n", $A, $B);
+} else {
+  die("Invalid algorithm ($algorithm)");
+}
+
+# Print the output, with probabilities in the last column.
+print($header);
+printf("# A=%g B=%g Error=%g\n", $A, $B, $err);
+chomp($titles);
+printf("$titles\tprobability\n");
+for (my $i = 0; $i < scalar(@predictions); $i++) {
+  my $prob = 1 / (1 + exp($A * $predictions[$i] + $B));
+  my $prediction;
+  if ($prob > 0.5) {
+    $prediction = 1;
+  } else {
+    $prediction = -1;
+  }
+  printf("%s\t%s\t%s\t%g\n", $names[$i], $prediction, $predictions[$i], $prob);
+}
+
+###########################################################################
+sub run_platt_algorithm {
+
+  # Input parameters (all accessed globally):
+  #   out = array of SVM outputs
+  #   target = array of Booleans : is ith example a positive example?
+  #   prior1 = number of positive examples
+  #   prior0 = number of negative examples
+  # Outputs:
+  #   A, B = parameters of sigmoid
+
+  my $A = 0;
+  my $B = log(($prior0 + 1)/($prior1 + 1));
+  my $hiTarget = ($prior1 + 1) / ($prior1 + 2);
+  my $loTarget = 1 / ($prior0 + 2);
+  my $lambda = 1e-3;
+  my $olderr = 1e300;
+  my $len = $prior0 + $prior1; # Added by WSN.
+  my $oldA;
+  my $oldB;
+  my $err;
+
+  # pp = temp array to store current estimate of probabilities
+  # set all pp elements to (prior1 + 1) / (prior0 + prior1 + 2)
+  my @pp;
+  for (my $i = 0; $i < $len; $i++){
+    $pp[$i] = ($prior1 + 1) / ($prior0 + $prior1 + 2);
+  }
+
+  my $count = 0;
+  for (my $it = 1; $it < 100; $it++) {
+
+    my $a = 0; 
+    my $b = 0;
+    my $c = 0;
+    my $d = 0;
+    my $e = 0;
+
+    # First, compute Hessian and gradient of error function w.r.t A and B.
+    my $t;
+    for (my $i = 0; $i < $len; $i++) {
+      if ($target[$i] == 1) {
+	$t = $hiTarget;
+      } else {
+	$t = $loTarget;
+      }
+      my $d1 = $pp[$i] - $t;
+      my $d2 = $pp[$i] * (1 - $pp[$i]);
+      $a += $out[$i] * $out[$i] * $d2;
+      $b += $d2;
+      $c += $out[$i] * $d2;
+      $d += $out[$i] * $d1;
+      $e += $d1;
+    }
+
+    # If gradient is really tiny, then stop.
+    if ((abs($d) < 1e-9) && (abs($e) < 1e-9)) {
+      last;
+    }
+    $oldA = $A;
+    $oldB = $B;
+    $err = 0;
+
+    # Loop until goodness of fit increases.
+    while (1) {
+      my $det = ($a + $lambda) * ($b + $lambda) - ($c * $c);
+
+      # If determinant of Hessian is zero, increase stabilizer.
+      if ($det == 0) { 
+	$lambda *= 10;
+	next;
+      }
+
+      $A = $oldA + (($b + $lambda) * $d - $c * $e) / $det;
+      $B = $oldB + (($a + $lambda) * $e - $c * $d) / $det;
+
+      # Now, compute goodness of fit.
+      $err = 0;
+      for (my $i = 0; $i < $len; $i++) {
+	my $p = 1/(1 + exp($out[$i] * $A + $B));
+	$pp[$i] = $p;
+	# At this step, make sure log(0) returns -200;
+	$err -= $t * log($p) + (1 - $t) * log(1 - $p);
+      }
+      if ($err < $olderr * (1 + 1e-7)) {
+	$lambda *= 0.1;
+	# print(STDERR "Decreasing lambda ($lambda).\n");
+	last;
+      }
+
+      # Error did not decrease: increase stabilizer by factor of 10 & try again
+      $lambda *= 10;
+      if ($lambda >= 1e12) { # Something is broken.  Give up.
+	die("lambda ($lambda) >= 1e6");
+      }
+    }
+
+    my $diff = $err - $olderr;
+    printf(STDERR "Iteration $it: error=%g delta=%g\n", $err, $diff);
+    my $scale = 0.5 * ($err + $olderr + 1);
+    if (($diff > -1e-3 * $scale) && ($diff < 1e-7 * $scale)) {
+      $count++;
+    } else {
+      $count = 0;
+    }
+    $olderr = $err;
+    if ($count == 3) {
+      last;
+    }
+  }
+
+  return($A, $B, $err);
+}
+
+#############################################################################
+sub run_lin_algorithm {
+
+  # Input parameters:
+  #   out = array of SVM outputs
+  #   target = array of Booleans : is ith example a positive example?
+  #   prior1 = number of positive examples
+  #   prior0 = number of negative examples
+  # Outputs:
+  #   A, B = parameters of sigmoid
+
+  # Parameter Setting
+  my $maxiter = 100;    # maximum number of iterations
+  my $minstep = 1e-10; # minimum step taken in line search
+  my $sigma = 1e-3; # set to any value > 0
+
+  # construct initial values: target supprot in array t, initial function
+  # value in fval
+  my $hiTarget = ($prior1 + 1.0) / ($prior1 + 2.0);
+  my $loTarget = 1 / ($prior0 + 2.0);
+  my $len = $prior0 + $prior1; # Added by WSN.
+
+  my @t;
+  for (my $i = 0; $i < $len; $i++) {
+    if ($target[$i] > 0) {
+      $t[$i] = $hiTarget;
+    } else {
+      $t[$i] = $loTarget;
+    }
+  }
+
+  my $A = 0;
+  my $B = log(($prior0 + 1.0)/($prior1 + 1.0));
+  my $fval = 0.0;
+  my $fApB;
+
+  for (my $i = 0; $i < $len; $i++) {
+    $fApB = $out[$i]*$A + $B;
+    if ($fApB >= 0) {
+      $fval += $t[$i] * $fApB + log(1.0 + exp(-$fApB));
+    } else {
+      $fval += ($t[$i] - 1.0) * $fApB + log(1.0+exp($fApB));
+    }
+  }
+
+  for (my $it = 0; $it < $maxiter; $it++) {
+    # Update Gradient and Hessian (use H' = H + sigma I)
+    my $h11 = $sigma;
+    my $h22 = $sigma;
+    my $h21 = 0.0;
+    my $g1 = 0.0;
+    my $g2 = 0.0;
+
+    for (my $i = 0; $i < $len; $i++) {
+      $fApB = $out[$i]*$A + $B;
+      my $p;
+      my $q;
+      if ($fApB >= 0) {
+	$p = exp(-$fApB)/(1.0 + exp(-$fApB));
+	$q = 1.0/(1.0+exp(-$fApB));
+      } else {
+	$p = 1.0 / (1.0+exp($fApB));
+	$q = exp($fApB)/(1.0+exp($fApB));
+      }
+      my $d2 = $p * $q;
+      $h11 += $out[$i] * $out[$i] * $d2;
+      $h22 += $d2;
+      $h21 += $out[$i] * $d2;
+      my $d1 = $t[$i] - $p;
+      $g1 += $out[$i] * $d1;
+      $g2 += $d1;
+    }
+
+    if (( abs($g1) < 1e-5 ) && ( abs($g2) < 1e-5)) {
+      last;	
+    }
+
+    my $det = $h11*$h22 - $h21*$h21;
+    my $dA = -($h22*$g1 - $h21*$g2)/$det;
+    my $dB = -(-$h21*$g1 + $h11*$g2)/$det;
+    my $gd = $g1*$dA + $g2*$dB;
+    
+    # line search
+    my $stepsize = 1;
+    while ($stepsize >= $minstep) {
+      my $newA = $A + $stepsize * $dA;
+      my $newB = $B + $stepsize * $dB;
+      my $newf = 0.0;
+      #printf(STDERR "# Iter=%g newA=%g newB=%g\n", $it, $newA, $newB);
+      for (my $i = 0; $i < $len; $i++) {
+	$fApB = $out[$i]*$newA + $newB;
+	if ($fApB >= 0 ) { 
+	  $newf += $t[$i]*$fApB+log(1+exp(-$fApB));
+	} else {
+	  $newf += ($t[$i]-1)*$fApB+log(1+exp($fApB));
+	}
+      }
+      if ($newf < ($fval + 0.0001*$stepsize*$gd)) {
+	$A = $newA;
+	$B = $newB;
+	$fval = $newf;
+	last;
+      } else {
+	$stepsize = $stepsize / 2.0;
+      }
+      if ($stepsize < $minstep) {
+	#printf(STDERR "Line Search Fails\n");
+	last;
+      }
+    }
+    if ($it >= $maxiter) {
+      printf(STDERR "Reached maximum iterations ($maxiter).\n");
+    }	
+  }
+
+  return($A, $B);
+}
+
+
+#############################################################################
+sub read_file_column {
+  my($column, $infile) = @_;
+  my($header, $titles, @values);
+
+  # Read the weights and the true classes.
+  open(INFILE, "<$infile") || die("Can't open $infile.\n");
+
+  # Skip comment and labels.
+  my $first_char = "#";
+  $header = "";
+  while ($first_char eq "#") {
+    my $line = <INFILE>;
+    $first_char = substr($line, 0, 1);
+    if ($first_char eq "#") {
+      $header .= $line;
+    } else {
+      $titles = $line;
+    }
+  }
+
+  # Read the data line by line.
+  while (my $line = <INFILE>) {
+    chomp($line);
+
+    # Store this value.
+    my @words = split('\t', $line);
+    push(@values, $words[$column]);
+  }
+  close(INFILE);
+
+  return($header, $titles, @values);
+}

@@ -1,0 +1,136 @@
+ <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<!--
+FILE: gist-kernel.html
+AUTHOR: William Stafford Noble
+CREATE DATE: 6/24/04
+PROJECT: GIST
+REVISION: $Revision: 1.2 $
+-->
+<head>
+<title>gist-kernel</title>
+</head>
+<body bgcolor=white>
+<center><h1>gist-kernel</h1></center>
+
+<blockquote>
+
+<p><b>Description:</B> Compute a square kernel matrix from a given matrix.
+
+<p>
+<b>Usage:</b> <code>gist-kernel [options]
+-data&nbsp;&lt;filename&gt;</code>
+
+<p><b>Input:</b> 
+
+<ul> 
+
+<li>
+<code>-data &lt;filename&gt;</code> - a labeled, tab-delimited
+file of data.  Missing values are not allowed.</li>
+
+</ul>
+
+<p>
+<b>Output:</b> A square, labeled tab-delimited kernel matrix, with
+dimension N by N, where N is the number of rows in the data file.</p>
+
+<p>
+<b>Options:</b>
+
+<ul>
+
+<li>
+<code>-kernel &lt;filename&gt;</code> - a file containing a list of
+kernel transformations, one per line.  Valid operations are listed
+below.</li>
+
+<li>
+<code>-iskernel</code> - Specify that the data file contains a kernel,
+so do not perform the initial scalar product operation.</li>
+
+<li>
+<code>-rdb</code> - Allow the program to read and create <A
+HREF="http://www.cse.ucsc.edu/research/compbio/rdb/index.html">RDB</A>
+formatted files, which contain an additional format line after the
+first line of text.</li>
+
+<li>
+<code>-precision &lt;value&gt;</code> - Number of digits after the
+decimal place in the output file.  The default value is 4.</li>
+
+<li>
+<code>-verbose 1|2|3|4|5</code> - Set the verbosity level of the
+output to stderr.  The default level is 2.</li>
+
+</ul>
+
+<p>
+<b>Kernel transformations:</b></p>
+
+<p>
+The kernel transformations file specifies on transformation per line.
+The transformations are carried out on the kernel matrix in the order
+listed, and may be repeated.  Some transformations include a required
+argument, which appears immediately after the transformation name.</p>
+
+
+<ul>
+
+<li>
+<code>constant &lt;value&gt;</code> - Add a given constant to every
+element in the kernel matrix.</li>
+
+<li>
+<code>coefficient &lt;value&gt;</code> - Multiply every element in the
+kernel matrix by the given value.</li>
+
+<li>
+<code>power &lt;value&gt;</code> - Raise every kernel matrix element
+to the given power.</li>
+
+<li>
+<code>radial &lt;value&gt;</code> - Perform a radial basis
+transformation of the kernel using the given width.</li>
+
+<li>
+<code>diagonal &lt;value&gt;</code> - Add a given value to every
+diagonal element in the kernel.</li>
+
+<li>
+<code>normalize</code> - Project each vector onto the
+unit sphere in the feature space.</li>
+
+<li>
+<code>center</code> - Center each data point in feature space.</li>
+
+<li>
+<code>diffusion &lt;value&gt;</code> - Convert the given kernel to a
+matrix of Euclidean distances, and run that matrix through a diffusion
+kernel computation, with the given value as the diffusion
+constant.</li>
+
+</ul>
+
+<P>
+<B>Warning messages:</B>
+
+<p>
+None</p>
+
+<p><b>Bugs:</b>
+<ul>
+<li>
+Does not yet implement the radial basis width selection heuristic, nor
+the asymmetric soft margin heuristic.</li>
+<li>
+Only creates square kernel matrices.</li>
+</UL>
+
+
+</BLOCKQUOTE>
+
+<HR>
+<A HREF="index.html">Gist</A>
+</BODY>
+</HTML>

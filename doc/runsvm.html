@@ -1,0 +1,69 @@
+ <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<!--
+FILE: runsvm
+AUTHOR: William Stafford Noble
+CREATE DATE: 5/4/99
+PROJECT: SVM
+-->
+<HEAD>
+<TITLE>runsvm</TITLE>
+</head>
+<BODY BGCOLOR=white>
+<CENTER><H1>runsvm</H1></CENTER>
+
+
+<P><B>Description:</B> Wrapper script to call the svm programs
+compute-weights and classify-train.
+
+<P><B>Usage:</B> runsvm [options] &lt;train data&gt; &lt;train
+classes&gt; &lt;test data&gt; &lt;weights&gt; &lt;predictions&gt;
+
+
+<P><B>Inputs:</B>
+All input and output files are in RDB format.
+<UL>
+<LI> train data - the training data, with labels in the first column
+<LI> train classes - the training set classifications, labels in the
+first column, classes (1 or -1) in the second column
+<LI> test data - test data, in the same format as the train data
+</UL>
+
+
+<P><B>Outputs:</B>
+<UL>
+<LI> weights - a file containing weights for each training set example
+<LI> predictions - a file containing class predictions for each test
+set example
+</UL>
+
+<P><B>Options:</B>
+<UL>
+<LI> -bin &lt;directory&gt; - Directory in which program binaries
+reside.
+<LI> -power &lt;value&gt; - Raise the kernel to the given power
+(default = 1).
+<LI> -coefficient &lt;value&gt; - Multiply the kernel by the given
+value (default = 1).
+<LI> -constant &lt;value&gt; - Add the given constant to the kernel
+(default = 1).
+<LI> -diagfactor &lt;value&gt; - Add to the diagonal of the kernel
+matrix (default = 0).  See SVM software documentation for details.
+<LI> -radial - Create a radial basis kernel.
+<LI> -normalize - Normalize the kernel.
+<LI> -posconstraint &lt;value&gt; - Set an upper bound on the values
+of weights for positive training set examples (default = 1).
+<LI> -negconstraint &lt;value&gt; - Set an upper bound on the values
+of weights for negative training set examples (default = 1).
+<LI> -noconstraint - Don't use any constraints on the weights.
+<LI> -threshold &lt;value&gt; - Train until the objective function
+changes by less than the given value (default = 0.000001).
+</UL>
+
+<P><B>Calls:</B> <A HREF="compute-weights.html">compute-weights</A>,
+<A HREF="classify-train.html">classify-train</A>
+
+</BODY>
+</HTML>
+
+
