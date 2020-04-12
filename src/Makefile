@@ -29,7 +29,7 @@ top_srcdir = ..
 prefix = /usr/local
 exec_prefix = ${prefix}
 
-bindir = ${exec_prefix}/bin
+bindir = /home/cicorias/bin/gist
 sbindir = ${exec_prefix}/sbin
 libexecdir = ${exec_prefix}/libexec
 datadir = ${prefix}/share
